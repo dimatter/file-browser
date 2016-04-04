@@ -3,15 +3,15 @@ FileBrowserView = require './file-browser-view'
 fs = require 'fs'
 path = require 'path'
 
-getDirectoryFiles = (directory)->
-  files = fs.readdirSync(directory)
+getDirectoryfiles = (directory)->
+  @files = fs.readdirSync(directory)
   folderList = [
     showedFilename: '..'
     realFilename: path.dirname(directory)
     isDir: true
   ]
   fileList = []
-  for fileName in files
+  for fileName in @files
     filePath = path.join(directory, fileName)
     item =
       showedFilename: fileName
@@ -43,51 +43,52 @@ module.exports = FileBrowser =
     currentDirectory: @currentDirectory
 
   open: ->
-    self = @
     editor = atom.workspace.getActiveTextEditor()
     filePath = atom.project.rootDirectories[0].path + '/.'
     if editor
       filePath = editor.getPath()
 
     @currentDirectory = path.dirname(filePath)
-    files = getDirectoryFiles(@currentDirectory)
+    @files = getDirectoryfiles(@currentDirectory)
 
     @fileBrowserView = new FileBrowserView()
-    @fileBrowserView.setFiles(files)
-
+    @fileBrowserView.setFiles(@files)
     pane = atom.workspace.getActivePane()
     filebrowserEditor = pane.addItem(@fileBrowserView)
     pane.activateItem(filebrowserEditor)
+    filebrowserEditor.model.insertNewline = => @handleOpen filebrowserEditor
 
-    filebrowserEditor.keydown (event)->
+    filebrowserEditor.keydown (event) =>
       # enter
       if event.which == 13
         event.stopPropagation()
-        cursor = filebrowserEditor.model.cursors[0]
-        file = files[cursor.getBufferRow()]
-        self.currentDirectory = file.realFilename
-        if file.isDir
-          files = getDirectoryFiles(file.realFilename)
-          self.fileBrowserView.setFiles(files)
-        else
-          atom.workspace.open(file.realFilename)
-        cursor.moveToTop()
-
+        @handleOpen filebrowserEditor
       # backspace
       if event.which == 8
         event.stopPropagation()
-        previousDirectory = self.currentDirectory
-        self.currentDirectory = path.dirname(self.currentDirectory)
-        files = getDirectoryFiles(self.currentDirectory)
-        row = files.map (i) ->
+        previousDirectory = @currentDirectory
+        @currentDirectory = path.dirname(@currentDirectory)
+        @files = getDirectoryfiles(@currentDirectory)
+        row = @files.map (i) ->
           i.realFilename
         .indexOf previousDirectory
-        self.fileBrowserView.setFiles(files)
+        @fileBrowserView.setFiles(@files)
 
         cursor = filebrowserEditor.model.cursors[0]
         cursor.moveToTop()
         cursor.moveDown(row)
     return
+
+  handleOpen: (filebrowserEditor) ->
+    cursor = filebrowserEditor.model.cursors[0]
+    file = @files[cursor.getBufferRow()]
+    @currentDirectory = file.realFilename
+    if file.isDir
+      @files = getDirectoryfiles(file.realFilename)
+      @fileBrowserView.setFiles(@files)
+    else
+      atom.workspace.open(file.realFilename)
+    cursor.moveToTop()
 
   search: ->
     return if atom.workspace.getActiveTextEditor()
